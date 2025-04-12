@@ -6,10 +6,10 @@ services:
     ports:
       - "8083:8080"
     environment:
-      - PORT=${{ shared.PORT }}
-      - SPRING_DATASOURCE_URL=${{ shared.MAP_DB_URL }}
-      - SPRING_DATASOURCE_USERNAME=${{ shared.MAP_DB_USERNAME }}
-      - SPRING_DATASOURCE_PASSWORD=${{ shared.MAP_DB_PASSWORD }}
+      - DATABASE_NAME=${{ shared.DATABASE_NAME }}
+      - ELASTICSEARCH_PASSWORD=${{ shared.ELASTICSEARCH_PASSWORD }}
+      - ELASTICSEARCH_URL=${{ shared.ELASTICSEARCH_URL }}
       - KAFKA_BOOTSTRAP_SERVERS=${{ shared.KAFKA_BOOTSTRAP_SERVERS }}
-      - MAP_API_KEY=${{ shared.MAP_API_KEY }}
+      - ELASTICSEARCH_USERNAME=${{ shared.ELASTICSEARCH_USERNAME }}
+      - MONGO_URI=${{ shared.MONGO_URI }}
     restart: always

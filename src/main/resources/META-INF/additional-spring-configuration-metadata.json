@@ -1,0 +1,39 @@
+{
+  "properties": [
+    {
+      "name": "supmap.properties.app-email",
+      "type": "java.lang.String",
+      "description": "Description for supmap.properties.app-email."
+    },
+    {
+      "name": "supmap.properties.database-name",
+      "type": "java.lang.String",
+      "description": "Description for supmap.properties.database-name."
+    },
+    {
+      "name": "supmap.properties.elasticsearch-password",
+      "type": "java.lang.String",
+      "description": "Description for supmap.properties.elasticsearch-password."
+    },
+    {
+      "name": "supmap.properties.elasticsearch-url",
+      "type": "java.lang.String",
+      "description": "Description for supmap.properties.elasticsearch-url."
+    },
+    {
+      "name": "supmap.properties.elasticsearch-username",
+      "type": "java.lang.String",
+      "description": "Description for supmap.properties.elasticsearch-username."
+    },
+    {
+      "name": "supmap.properties.kafka-bootstrap-servers",
+      "type": "java.lang.String",
+      "description": "Description for supmap.properties.kafka-bootstrap-servers."
+    },
+    {
+      "name": "supmap.properties.mongo-uri",
+      "type": "java.lang.String",
+      "description": "Description for supmap.properties.mongo-uri."
+    }
+  ]
+}

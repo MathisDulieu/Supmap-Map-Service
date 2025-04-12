@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings>
+    <servers>
+        <server>
+            <id>nexus-releases</id>
+            <username>${nexus.username}</username>
+            <password>${nexus.password}</password>
+        </server>
+        <server>
+            <id>nexus-snapshots</id>
+            <username>${nexus.username}</username>
+            <password>${nexus.password}</password>
+        </server>
+    </servers>
+</settings>
