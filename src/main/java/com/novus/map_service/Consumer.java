@@ -102,7 +102,6 @@ public class Consumer {
             case "shareRoute":
                 sharingService.processShareRoute(kafkaMessage);
                 break;
-
             default:
                 log.warn("Unknown operation: {}", operationKey);
                 break;

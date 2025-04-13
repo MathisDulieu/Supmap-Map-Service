@@ -1,5 +1,6 @@
 package com.novus.map_service;
 
+import com.novus.map_service.configuration.DateConfiguration;
 import com.novus.map_service.configuration.EnvConfiguration;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -10,13 +11,14 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
-import java.util.Date;
 import java.util.TimeZone;
 
 @Slf4j
 @SpringBootApplication(scanBasePackages = "com.novus.map_service")
 @EnableConfigurationProperties(EnvConfiguration.class)
 public class MapServiceApplication {
+
+	private final DateConfiguration dateConfiguration = new DateConfiguration();
 
 	public static void main(String[] args) {
 		SpringApplication.run(MapServiceApplication.class, args);
@@ -25,7 +27,7 @@ public class MapServiceApplication {
 	@PostConstruct
 	void setLocalTimeZone() {
 		TimeZone.setDefault(TimeZone.getTimeZone("Europe/Paris"));
-		log.info("User Service running in Paris timezone, started at: {}", new Date());
+		log.info("Map Service running in Paris timezone, started at: {}", dateConfiguration.newDate());
 	}
 
 	@Configuration

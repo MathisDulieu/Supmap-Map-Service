@@ -1,6 +1,7 @@
 package com.novus.map_service.services;
 
 import com.novus.map_service.UuidProvider;
+import com.novus.map_service.configuration.DateConfiguration;
 import com.novus.map_service.dao.LocationDaoUtils;
 import com.novus.map_service.dao.UserDaoUtils;
 import com.novus.map_service.utils.LogUtils;
@@ -18,7 +19,10 @@ import org.springframework.stereotype.Service;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -29,14 +33,14 @@ public class LocationService {
     private final LocationDaoUtils locationDaoUtils;
     private final UserDaoUtils userDaoUtils;
     private final UuidProvider uuidProvider;
+    private final DateConfiguration dateConfiguration;
 
     public void processGetUserFavoriteLocations(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
+        log.info("Starting to process get user favorite locations request for user: {}", authenticatedUser.getId());
 
         try {
-            log.info("Retrieving favorite locations for user: {}", authenticatedUser.getId());
-
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
             userDaoUtils.save(authenticatedUser);
 
             logUtils.buildAndSaveLog(
@@ -45,21 +49,24 @@ public class LocationService {
                     kafkaMessage.getIpAddress(),
                     String.format("User with ID '%s' retrieved their favorite locations", authenticatedUser.getId()),
                     HttpMethod.GET,
-                    "/map/locations/favorites",
+                    "/private/map/favorite/locations",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Favorite locations successfully retrieved for user: {}", authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing get user favorite locations request: {}", e.getMessage());
             logError(e, kafkaMessage, "GET_USER_FAVORITE_LOCATIONS_ERROR",
                     "Error processing get user favorite locations request",
-                    HttpMethod.GET, "/map/locations/favorites", authenticatedUser);
+                    HttpMethod.GET, "/private/map/favorite/locations", authenticatedUser);
         }
     }
 
     public void processSaveNewUserFavoriteLocation(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process save new user favorite location request for user: {}", authenticatedUser.getId());
 
         try {
             String locationType = request.get("locationType");
@@ -71,9 +78,6 @@ public class LocationService {
             String postalCode = request.get("postalCode");
             double latitude = Double.parseDouble(request.get("latitude"));
             double longitude = Double.parseDouble(request.get("longitude"));
-
-            log.info("Saving new favorite location '{}' of type '{}' for user: {}",
-                    name, locationType, authenticatedUser.getId());
 
             GeoPoint geoPoint = GeoPoint.builder()
                     .latitude(latitude)
@@ -92,7 +96,7 @@ public class LocationService {
                     .coordinates(geoPoint)
                     .build();
 
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
 
             List<String> favoriteLocationIds = authenticatedUser.getFavoriteLocationIds();
             if (favoriteLocationIds == null) {
@@ -111,26 +115,27 @@ public class LocationService {
                     String.format("User with ID '%s' saved a new favorite location '%s'",
                             authenticatedUser.getId(), name),
                     HttpMethod.POST,
-                    "/map/locations/favorites",
+                    "/private/map/favorite/location",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("New favorite location '{}' successfully saved for user: {}", name, authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing save new user favorite location request: {}", e.getMessage());
             logError(e, kafkaMessage, "SAVE_NEW_USER_FAVORITE_LOCATION_ERROR",
                     "Error processing save new user favorite location request",
-                    HttpMethod.POST, "/map/locations/favorites", authenticatedUser);
+                    HttpMethod.POST, "/private/map/favorite/location", authenticatedUser);
         }
     }
 
     public void processDeleteUserFavoriteLocation(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process delete user favorite location request for user: {}", authenticatedUser.getId());
 
         try {
             String locationId = request.get("locationId");
-
-            log.info("Deleting favorite location with ID {} for user: {}", locationId, authenticatedUser.getId());
 
             if (!authenticatedUser.getFavoriteLocationIds().contains(locationId)) {
                 String errorMessage = String.format("Location with ID '%s' not found in user's favorites", locationId);
@@ -138,7 +143,7 @@ public class LocationService {
             }
 
             authenticatedUser.getFavoriteLocationIds().remove(locationId);
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
 
             userDaoUtils.save(authenticatedUser);
 
@@ -157,25 +162,29 @@ public class LocationService {
                     String.format("User with ID '%s' deleted favorite location with ID '%s'",
                             authenticatedUser.getId(), locationId),
                     HttpMethod.DELETE,
-                    "/map/locations/favorites/" + locationId,
+                    "/private/map/favorite/location/{id}" + locationId,
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Favorite location with ID {} successfully deleted for user: {}", locationId, authenticatedUser.getId());
         } catch (ResourceNotFoundException e) {
+            log.error("Error occurred while processing delete user favorite location request: {}", e.getMessage());
             logError(e, kafkaMessage, "DELETE_USER_FAVORITE_LOCATION_ERROR",
                     e.getMessage(),
-                    HttpMethod.DELETE, "/map/locations/favorites/" + request.get("locationId"), authenticatedUser);
+                    HttpMethod.DELETE, "/private/map/favorite/location/{id}" + request.get("locationId"), authenticatedUser);
         } catch (Exception e) {
+            log.error("Error occurred while processing delete user favorite location request: {}", e.getMessage());
             logError(e, kafkaMessage, "DELETE_USER_FAVORITE_LOCATION_ERROR",
                     "Error processing delete user favorite location request",
-                    HttpMethod.DELETE, "/map/locations/favorites/" + request.get("locationId"), authenticatedUser);
+                    HttpMethod.DELETE, "/private/map/favorite/location/{id}" + request.get("locationId"), authenticatedUser);
         }
     }
 
     public void processUpdateUserFavoriteLocation(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process update user favorite location request for user: {}", authenticatedUser.getId());
 
         try {
             String locationId = request.get("locationId");
@@ -188,8 +197,6 @@ public class LocationService {
             String postalCode = request.get("postalCode");
             double latitude = Double.parseDouble(request.get("latitude"));
             double longitude = Double.parseDouble(request.get("longitude"));
-
-            log.info("Updating favorite location with ID {} for user: {}", locationId, authenticatedUser.getId());
 
             Optional<Location> optionalLocation = locationDaoUtils.findById(locationId);
             if (optionalLocation.isEmpty()) {
@@ -212,9 +219,9 @@ public class LocationService {
             location.setPostalCode(postalCode);
             location.setCoordinates(geoPoint);
 
-            location.setUpdatedAt(new Date());
+            location.setUpdatedAt(dateConfiguration.newDate());
 
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
 
             userDaoUtils.save(authenticatedUser);
             locationDaoUtils.save(optionalLocation.get());
@@ -226,15 +233,17 @@ public class LocationService {
                     String.format("User with ID '%s' updated favorite location with ID '%s'",
                             authenticatedUser.getId(), locationId),
                     HttpMethod.PUT,
-                    "/map/locations/favorites/" + locationId,
+                    "/private/map/favorite/location/{id}" + locationId,
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Favorite location with ID {} successfully updated for user: {}", locationId, authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing update user favorite location request: {}", e.getMessage());
             logError(e, kafkaMessage, "UPDATE_USER_FAVORITE_LOCATION_ERROR",
                     "Error processing update user favorite location request",
-                    HttpMethod.PUT, "/map/locations/favorites/" + request.get("locationId"), authenticatedUser);
+                    HttpMethod.PUT, "/private/map/favorite/location/{id}" + request.get("locationId"), authenticatedUser);
         }
     }
 

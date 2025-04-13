@@ -1,6 +1,6 @@
 package com.novus.map_service.services;
 
-import com.novus.map_service.dao.AdminDashboardDaoUtils;
+import com.novus.map_service.configuration.DateConfiguration;
 import com.novus.map_service.dao.UserDaoUtils;
 import com.novus.map_service.utils.LogUtils;
 import com.novus.shared_models.common.Kafka.KafkaMessage;
@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Date;
 
 @Slf4j
 @Service
@@ -21,16 +20,15 @@ import java.util.Date;
 public class AdminDashboardService {
 
     private final LogUtils logUtils;
-    private final AdminDashboardDaoUtils adminDashboardDaoUtils;
     private final UserDaoUtils userDaoUtils;
+    private final DateConfiguration dateConfiguration;
 
     public void processGetMapAdminDashboardData(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
+        log.info("Starting to process map admin dashboard data request for user: {}", authenticatedUser.getId());
 
         try {
-            log.info("Retrieving map admin dashboard data for user: {}", authenticatedUser.getId());
-
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
             userDaoUtils.save(authenticatedUser);
 
             logUtils.buildAndSaveLog(
@@ -39,12 +37,14 @@ public class AdminDashboardService {
                     kafkaMessage.getIpAddress(),
                     String.format("User with ID '%s' retrieved admin dashboard data", authenticatedUser.getId()),
                     HttpMethod.GET,
-                    "/map/admin-dashboard",
+                    "/private/admin/map/dashboard-data",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Map admin dashboard data successfully retrieved for user: {}", authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing map admin dashboard data request: {}", e.getMessage());
             StringWriter sw = new StringWriter();
             PrintWriter pw = new PrintWriter(sw);
             e.printStackTrace(pw);
@@ -56,7 +56,7 @@ public class AdminDashboardService {
                     kafkaMessage.getIpAddress(),
                     "Error processing get map admin dashboard data request: " + e.getMessage(),
                     HttpMethod.GET,
-                    "/map/admin-dashboard",
+                    "/private/admin/map/dashboard-data",
                     "map-service",
                     stackTrace,
                     authenticatedUser.getId()

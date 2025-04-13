@@ -1,39 +1,34 @@
 {
   "properties": [
     {
-      "name": "supmap.properties.app-email",
-      "type": "java.lang.String",
-      "description": "Description for supmap.properties.app-email."
-    },
-    {
       "name": "supmap.properties.database-name",
       "type": "java.lang.String",
-      "description": "Description for supmap.properties.database-name."
+      "description": "The name of the database to be used by the SupMap application. This property defines the database instance that will store all application data."
     },
     {
       "name": "supmap.properties.elasticsearch-password",
       "type": "java.lang.String",
-      "description": "Description for supmap.properties.elasticsearch-password."
+      "description": "The password for authenticating with the Elasticsearch service. This credential is used to establish a secure connection to the Elasticsearch instance."
     },
     {
       "name": "supmap.properties.elasticsearch-url",
       "type": "java.lang.String",
-      "description": "Description for supmap.properties.elasticsearch-url."
+      "description": "The URL endpoint for the Elasticsearch service. This property specifies the location where the Elasticsearch instance can be accessed, including protocol, host, and port."
     },
     {
       "name": "supmap.properties.elasticsearch-username",
       "type": "java.lang.String",
-      "description": "Description for supmap.properties.elasticsearch-username."
+      "description": "The username for authenticating with the Elasticsearch service. This credential is used alongside the password to establish a secure connection to the Elasticsearch instance."
     },
     {
       "name": "supmap.properties.kafka-bootstrap-servers",
       "type": "java.lang.String",
-      "description": "Description for supmap.properties.kafka-bootstrap-servers."
+      "description": "A comma-separated list of host:port pairs for establishing the initial connection to the Kafka cluster. This property is essential for the application to connect to Kafka for message streaming capabilities."
     },
     {
       "name": "supmap.properties.mongo-uri",
       "type": "java.lang.String",
-      "description": "Description for supmap.properties.mongo-uri."
+      "description": "The connection URI for MongoDB. This string includes all necessary connection parameters including host, port, authentication credentials, and database options required to establish a connection to the MongoDB instance."
     }
   ]
 }

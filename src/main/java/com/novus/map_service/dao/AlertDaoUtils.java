@@ -2,7 +2,6 @@ package com.novus.map_service.dao;
 
 import com.novus.database_utils.Alert.AlertDao;
 import com.novus.shared_models.common.Alert.Alert;
-import com.novus.shared_models.common.User.User;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 

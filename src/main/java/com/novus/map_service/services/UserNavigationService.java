@@ -1,9 +1,13 @@
 package com.novus.map_service.services;
 
+import com.novus.map_service.configuration.DateConfiguration;
+import com.novus.map_service.dao.UserDaoUtils;
 import com.novus.map_service.utils.LogUtils;
 import com.novus.shared_models.common.Kafka.KafkaMessage;
 import com.novus.shared_models.common.Log.HttpMethod;
 import com.novus.shared_models.common.Log.LogLevel;
+import com.novus.shared_models.common.User.NavigationPreferences;
+import com.novus.shared_models.common.User.TransportMode;
 import com.novus.shared_models.common.User.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,20 +23,35 @@ import java.util.Map;
 public class UserNavigationService {
 
     private final LogUtils logUtils;
+    private final UserDaoUtils userDaoUtils;
+    private final DateConfiguration dateConfiguration;
 
     public void processUpdateUserNavigationPreferences(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process update user navigation preferences request for user: {}", authenticatedUser.getId());
 
         try {
             String preferredTransportMode = request.get("preferredTransportMode");
             int proximityAlertDistance = Integer.parseInt(request.get("proximityAlertDistance"));
+            boolean avoidTolls = Boolean.parseBoolean(request.get("avoidTolls"));
+            boolean avoidHighways = Boolean.parseBoolean(request.get("avoidHighways"));
+            boolean avoidTraffic = Boolean.parseBoolean(request.get("avoidTraffic"));
+            boolean showUsers = Boolean.parseBoolean(request.get("showUsers"));
 
-            log.info("Updating navigation preferences for user {}: transport mode = {}, alert distance = {} meters",
-                    authenticatedUser.getId(), preferredTransportMode, proximityAlertDistance);
+            NavigationPreferences navigationPreferences = authenticatedUser.getNavigationPreferences();
+            navigationPreferences.setPreferredTransportMode(TransportMode.valueOf(preferredTransportMode));
+            navigationPreferences.setProximityAlertDistance(proximityAlertDistance);
+            navigationPreferences.setAvoidTolls(avoidTolls);
+            navigationPreferences.setAvoidHighways(avoidHighways);
+            navigationPreferences.setAvoidTraffic(avoidTraffic);
+            navigationPreferences.setShowUsers(showUsers);
+            authenticatedUser.setNavigationPreferences(navigationPreferences);
 
-            // Update navigation preferences logic here
-            // You might want to update user preferences in a user repository
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
+            authenticatedUser.setUpdatedAt(dateConfiguration.newDate());
+
+            userDaoUtils.save(authenticatedUser);
 
             logUtils.buildAndSaveLog(
                     LogLevel.INFO,
@@ -40,27 +59,28 @@ public class UserNavigationService {
                     kafkaMessage.getIpAddress(),
                     String.format("User with ID '%s' updated their navigation preferences", authenticatedUser.getId()),
                     HttpMethod.PUT,
-                    "/map/preferences",
+                    "/private/map/navigation-preferences",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Navigation preferences successfully updated for user: {}", authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing update user navigation preferences request: {}", e.getMessage());
             logError(e, kafkaMessage, "UPDATE_USER_NAVIGATION_PREFERENCES_ERROR",
                     "Error processing update user navigation preferences request",
-                    HttpMethod.PUT, "/map/preferences", authenticatedUser);
+                    HttpMethod.PUT, "/private/map/navigation-preferences", authenticatedUser);
         }
     }
 
     public void processGetNearbyUsers(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
+        log.info("Starting to process get nearby users request for user: {}", authenticatedUser.getId());
 
         try {
-            log.info("Finding nearby users for user: {}", authenticatedUser.getId());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
 
-            // Get nearby users logic here
-            // This would typically involve spatial queries or proximity calculations
-            // List<UserLocationDto> nearbyUsers = mapUtils.buildGetNearbyUsersUsersResponse(latitude, longitude);
+            userDaoUtils.save(authenticatedUser);
 
             logUtils.buildAndSaveLog(
                     LogLevel.INFO,
@@ -68,15 +88,17 @@ public class UserNavigationService {
                     kafkaMessage.getIpAddress(),
                     String.format("User with ID '%s' requested nearby users", authenticatedUser.getId()),
                     HttpMethod.GET,
-                    "/map/users/nearby",
+                    "/private/map/nearby-users",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Nearby users successfully retrieved for user: {}", authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing get nearby users request: {}", e.getMessage());
             logError(e, kafkaMessage, "GET_NEARBY_USERS_ERROR",
                     "Error processing get nearby users request",
-                    HttpMethod.GET, "/map/users/nearby", authenticatedUser);
+                    HttpMethod.GET, "/private/map/nearby-users", authenticatedUser);
         }
     }
 

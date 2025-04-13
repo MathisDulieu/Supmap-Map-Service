@@ -1,10 +1,13 @@
 package com.novus.map_service.services;
 
 import com.novus.map_service.UuidProvider;
+import com.novus.map_service.configuration.DateConfiguration;
+import com.novus.map_service.dao.AdminDashboardDaoUtils;
 import com.novus.map_service.dao.AlertDaoUtils;
 import com.novus.map_service.dao.UserDaoUtils;
 import com.novus.map_service.utils.LogUtils;
 import com.novus.shared_models.GeoPoint;
+import com.novus.shared_models.common.AdminDashboard.AdminDashboard;
 import com.novus.shared_models.common.Alert.Alert;
 import com.novus.shared_models.common.Alert.AlertType;
 import com.novus.shared_models.common.Kafka.KafkaMessage;
@@ -32,25 +35,25 @@ public class AlertService {
     private final AlertDaoUtils alertDaoUtils;
     private final UuidProvider uuidProvider;
     private final UserDaoUtils userDaoUtils;
+    private final DateConfiguration dateConfiguration;
+    private final AdminDashboardDaoUtils adminDashboardDaoUtils;
 
     public void processSaveNewAlert(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process save new alert request for user: {}", authenticatedUser.getId());
 
         try {
             String alertType = request.get("alertType");
             double latitude = Double.parseDouble(request.get("latitude"));
             double longitude = Double.parseDouble(request.get("longitude"));
 
-            log.info("Saving new alert of type {} at coordinates [{}, {}] for user {}",
-                    alertType, latitude, longitude, authenticatedUser.getId());
-
             GeoPoint location = GeoPoint.builder()
                     .latitude(latitude)
                     .longitude(longitude)
                     .build();
 
-            Date expiresAt = new Date(System.currentTimeMillis() + (30 * 60 * 1000));
+            Date expiresAt = new Date(dateConfiguration.newDate().getTime() + (30 * 60 * 1000));
 
             Alert alert = Alert.builder()
                     .id(uuidProvider.generateUuid())
@@ -63,9 +66,31 @@ public class AlertService {
 
             alertDaoUtils.save(alert);
 
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
             authenticatedUser.getStats().setTotalReportsSubmitted(authenticatedUser.getStats().getTotalReportsSubmitted() + 1);
             userDaoUtils.save(authenticatedUser);
+
+            Optional<AdminDashboard> optionalAdminDashboard = adminDashboardDaoUtils.find();
+            if (optionalAdminDashboard.isEmpty()) {
+                throw new RuntimeException("Admin dashboard not found");
+            }
+
+            AdminDashboard adminDashboard = optionalAdminDashboard.get();
+            Map<String, Integer> incidentsByType = adminDashboard.getIncidentsByType();
+
+            incidentsByType.put(alertType, incidentsByType.getOrDefault(alertType, 0) + 1);
+
+            adminDashboardDaoUtils.save(
+                    adminDashboard.getId(),
+                    adminDashboard.getAppRatingByNumberOfRate(),
+                    adminDashboard.getTopContributors(),
+                    adminDashboard.getUserGrowthStats(),
+                    adminDashboard.getUserActivityMetrics(),
+                    adminDashboard.getRouteRecalculations(),
+                    adminDashboard.getIncidentConfirmationRate(),
+                    incidentsByType,
+                    adminDashboard.getTotalRoutesProposed()
+            );
 
             logUtils.buildAndSaveLog(
                     LogLevel.INFO,
@@ -74,70 +99,75 @@ public class AlertService {
                     String.format("User with ID '%s' created a new alert of type '%s'",
                             authenticatedUser.getId(), alertType),
                     HttpMethod.POST,
-                    "/map/alerts",
+                    "/private/map/alert",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("New alert of type {} successfully saved for user: {}", alertType, authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing save new alert request: {}", e.getMessage());
             logError(e, kafkaMessage, "SAVE_NEW_ALERT_ERROR",
                     "Error processing save new alert request",
-                    HttpMethod.POST, "/map/alerts", authenticatedUser);
+                    HttpMethod.POST, "/private/map/alert", authenticatedUser);
         }
     }
 
     public void processGetAllAlertsByPosition(KafkaMessage kafkaMessage) {
-        try {
-            log.info("Processing get all alerts by position request");
+        log.info("Starting to process get all alerts by position request");
 
+        try {
             logUtils.buildAndSaveLog(
                     LogLevel.INFO,
                     "GET_ALL_ALERTS_BY_POSITION_SUCCESS",
                     kafkaMessage.getIpAddress(),
                     "Successfully retrieved alerts by position",
                     HttpMethod.GET,
-                    "/map/alerts/by-position",
+                    "/map/alerts/position",
                     "map-service",
                     null,
                     null
             );
+            log.info("Alerts by position successfully retrieved");
         } catch (Exception e) {
+            log.error("Error occurred while processing get alerts by position request: {}", e.getMessage());
             logError(e, kafkaMessage, "GET_ALL_ALERTS_BY_POSITION_ERROR",
                     "Error processing get alerts by position request",
-                    HttpMethod.GET, "/map/alerts/by-position", null);
+                    HttpMethod.GET, "/map/alerts/position", null);
         }
     }
 
     public void processGetAllAlertsByRoute(KafkaMessage kafkaMessage) {
-        try {
-            log.info("Processing get all alerts by route request");
+        log.info("Starting to process get all alerts by route request");
 
+        try {
             logUtils.buildAndSaveLog(
                     LogLevel.INFO,
                     "GET_ALL_ALERTS_BY_ROUTE_SUCCESS",
                     kafkaMessage.getIpAddress(),
                     "Successfully retrieved alerts by route",
                     HttpMethod.GET,
-                    "/map/alerts/by-route",
+                    "/map/alerts/route",
                     "map-service",
                     null,
                     null
             );
+            log.info("Alerts by route successfully retrieved");
         } catch (Exception e) {
+            log.error("Error occurred while processing get alerts by route request: {}", e.getMessage());
             logError(e, kafkaMessage, "GET_ALL_ALERTS_BY_ROUTE_ERROR",
                     "Error processing get alerts by route request",
-                    HttpMethod.GET, "/map/alerts/by-route", null);
+                    HttpMethod.GET, "/map/alerts/route", null);
         }
     }
 
     public void processValidateUserAlert(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process validate user alert request for user: {}", authenticatedUser.getId());
 
         try {
             String alertId = request.get("alertId");
-
-            log.info("Validating alert with ID {} by user {}", alertId, authenticatedUser.getId());
 
             Optional<Alert> optionalAlert = alertDaoUtils.findById(alertId);
             if (optionalAlert.isEmpty()) {
@@ -168,15 +198,15 @@ public class AlertService {
             Date newExpirationDate = new Date(currentExpirationDate.getTime() + (15 * 60 * 1000));
             alert.setExpiresAt(newExpirationDate);
 
-            alert.setUpdatedAt(new Date());
+            alert.setUpdatedAt(dateConfiguration.newDate());
 
             authenticatedUser.getStats().setValidatedReports(
                     authenticatedUser.getStats().getValidatedReports() + 1
             );
 
-            authenticatedUser.setLastActivityDate(new Date());
-            alertOwner.setUpdatedAt(new Date());
-            authenticatedUser.setUpdatedAt(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
+            alertOwner.setUpdatedAt(dateConfiguration.newDate());
+            authenticatedUser.setUpdatedAt(dateConfiguration.newDate());
 
             userDaoUtils.save(authenticatedUser);
             userDaoUtils.save(alertOwner);
@@ -189,30 +219,32 @@ public class AlertService {
                     String.format("User with ID '%s' validated alert with ID '%s'",
                             authenticatedUser.getId(), alertId),
                     HttpMethod.POST,
-                    "/map/alerts/validate",
+                    "/private/map/alert/validate/{id}",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Alert with ID {} successfully validated by user: {}", alertId, authenticatedUser.getId());
         } catch (ResourceNotFoundException e) {
+            log.error("Error occurred while processing validate user alert request: {}", e.getMessage());
             logError(e, kafkaMessage, "VALIDATE_USER_ALERT_ERROR",
                     e.getMessage(),
-                    HttpMethod.POST, "/map/alerts/validate", authenticatedUser);
+                    HttpMethod.POST, "/private/map/alert/validate/{id}", authenticatedUser);
         } catch (Exception e) {
+            log.error("Error occurred while processing validate user alert request: {}", e.getMessage());
             logError(e, kafkaMessage, "VALIDATE_USER_ALERT_ERROR",
                     "Error processing validate user alert request",
-                    HttpMethod.POST, "/map/alerts/validate", authenticatedUser);
+                    HttpMethod.POST, "/private/map/alert/validate/{id}", authenticatedUser);
         }
     }
 
     public void processInvalidateUserAlert(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process invalidate user alert request for user: {}", authenticatedUser.getId());
 
         try {
             String alertId = request.get("alertId");
-
-            log.info("Invalidating alert with ID {} by user {}", alertId, authenticatedUser.getId());
 
             Optional<Alert> optionalAlert = alertDaoUtils.findById(alertId);
             if (optionalAlert.isEmpty()) {
@@ -239,15 +271,15 @@ public class AlertService {
             Date newExpirationDate = new Date(currentExpirationDate.getTime() - (5 * 60 * 1000));
             alert.setExpiresAt(newExpirationDate);
 
-            alert.setUpdatedAt(new Date());
+            alert.setUpdatedAt(dateConfiguration.newDate());
 
             authenticatedUser.getStats().setValidatedReports(
                     authenticatedUser.getStats().getValidatedReports() + 1
             );
 
-            authenticatedUser.setLastActivityDate(new Date());
-            alertOwner.setUpdatedAt(new Date());
-            authenticatedUser.setUpdatedAt(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
+            alertOwner.setUpdatedAt(dateConfiguration.newDate());
+            authenticatedUser.setUpdatedAt(dateConfiguration.newDate());
 
             userDaoUtils.save(authenticatedUser);
             userDaoUtils.save(alertOwner);
@@ -260,19 +292,22 @@ public class AlertService {
                     String.format("User with ID '%s' invalidated alert with ID '%s'",
                             authenticatedUser.getId(), alertId),
                     HttpMethod.POST,
-                    "/map/alerts/invalidate",
+                    "/private/map/alert/invalidate/{id}",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Alert with ID {} successfully invalidated by user: {}", alertId, authenticatedUser.getId());
         } catch (ResourceNotFoundException e) {
+            log.error("Error occurred while processing invalidate user alert request: {}", e.getMessage());
             logError(e, kafkaMessage, "INVALIDATE_USER_ALERT_ERROR",
                     e.getMessage(),
-                    HttpMethod.POST, "/map/alerts/invalidate", authenticatedUser);
+                    HttpMethod.POST, "/private/map/alert/invalidate/{id}", authenticatedUser);
         } catch (Exception e) {
+            log.error("Error occurred while processing invalidate user alert request: {}", e.getMessage());
             logError(e, kafkaMessage, "INVALIDATE_USER_ALERT_ERROR",
                     "Error processing invalidate user alert request",
-                    HttpMethod.POST, "/map/alerts/invalidate", authenticatedUser);
+                    HttpMethod.POST, "/private/map/alert/invalidate/{id}", authenticatedUser);
         }
     }
 

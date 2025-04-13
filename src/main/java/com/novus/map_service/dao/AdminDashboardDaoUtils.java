@@ -22,10 +22,6 @@ public class AdminDashboardDaoUtils {
         this.adminDashboardDao = new AdminDashboardDao<>(mongoTemplate);
     }
 
-    public Optional<AdminDashboard> find() {
-        return adminDashboardDao.findMe(AdminDashboard.class);
-    }
-
     public void save(String adminDashboardId, Map<Integer, Double> appRatingByNumberOfRate,
                      List<UserContributionResponse> topContributors, List<MonthlyUserStatsResponse> userGrowthStats,
                      UserActivityMetricsResponse userActivityMetrics, List<HourlyRouteRecalculationResponse> routeRecalculations,
@@ -42,6 +38,10 @@ public class AdminDashboardDaoUtils {
                 incidentsByType,
                 totalRoutesProposed
         );
+    }
+
+    public Optional<AdminDashboard> find() {
+        return adminDashboardDao.findMe(AdminDashboard.class);
     }
 
 }

@@ -1,25 +1,30 @@
 package com.novus.map_service.services;
 
 import com.novus.map_service.UuidProvider;
+import com.novus.map_service.configuration.DateConfiguration;
+import com.novus.map_service.dao.AdminDashboardDaoUtils;
 import com.novus.map_service.dao.RouteDaoUtils;
 import com.novus.map_service.dao.UserDaoUtils;
 import com.novus.map_service.utils.LogUtils;
 import com.novus.shared_models.GeoPoint;
+import com.novus.shared_models.common.AdminDashboard.AdminDashboard;
 import com.novus.shared_models.common.Kafka.KafkaMessage;
 import com.novus.shared_models.common.Log.HttpMethod;
 import com.novus.shared_models.common.Log.LogLevel;
 import com.novus.shared_models.common.Route.Route;
 import com.novus.shared_models.common.User.User;
 import com.novus.shared_models.common.User.UserStats;
+import com.novus.shared_models.response.Map.HourlyRouteRecalculationResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Date;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -30,10 +35,13 @@ public class RouteService {
     private final RouteDaoUtils routeDaoUtils;
     private final UserDaoUtils userDaoUtils;
     private final UuidProvider uuidProvider;
+    private final DateConfiguration dateConfiguration;
+    private final AdminDashboardDaoUtils adminDashboardDaoUtils;
 
     public void processSaveUserRoute(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
         Map<String, String> request = kafkaMessage.getRequest();
+        log.info("Starting to process save user route request for user: {}", authenticatedUser.getId());
 
         try {
             String startAddress = request.get("startAddress");
@@ -44,9 +52,6 @@ public class RouteService {
             double startPointLatitude = Double.parseDouble(request.get("startPointLatitude"));
             double startPointLongitude = Double.parseDouble(request.get("startPointLongitude"));
             int estimatedDurationInSeconds = Integer.parseInt(request.get("estimatedDurationInSeconds"));
-
-            log.info("Saving route from '{}' to '{}' ({} km) for user: {}",
-                    startAddress, endAddress, kilometersDistance, authenticatedUser.getId());
 
             GeoPoint startPoint = GeoPoint.builder()
                     .latitude(startPointLatitude)
@@ -69,7 +74,7 @@ public class RouteService {
                     .userId(authenticatedUser.getId())
                     .build();
 
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
 
             List<String> recentRouteIds = authenticatedUser.getRecentRouteIds();
             if (recentRouteIds.size() >= 5) {
@@ -84,6 +89,27 @@ public class RouteService {
             userDaoUtils.save(authenticatedUser);
             routeDaoUtils.save(route);
 
+            Optional<AdminDashboard> optionalAdminDashboard = adminDashboardDaoUtils.find();
+            if (optionalAdminDashboard.isEmpty()) {
+                throw new RuntimeException("Admin dashboard not found");
+            }
+
+            AdminDashboard adminDashboard = optionalAdminDashboard.get();
+
+            int totalRoutesProposed = adminDashboard.getTotalRoutesProposed() + 1;
+
+            adminDashboardDaoUtils.save(
+                    adminDashboard.getId(),
+                    adminDashboard.getAppRatingByNumberOfRate(),
+                    adminDashboard.getTopContributors(),
+                    adminDashboard.getUserGrowthStats(),
+                    adminDashboard.getUserActivityMetrics(),
+                    adminDashboard.getRouteRecalculations(),
+                    adminDashboard.getIncidentConfirmationRate(),
+                    adminDashboard.getIncidentsByType(),
+                    totalRoutesProposed
+            );
+
             logUtils.buildAndSaveLog(
                     LogLevel.INFO,
                     "SAVE_USER_ROUTE_SUCCESS",
@@ -91,25 +117,26 @@ public class RouteService {
                     String.format("User with ID '%s' saved a route from '%s' to '%s'",
                             authenticatedUser.getId(), startAddress, endAddress),
                     HttpMethod.POST,
-                    "/map/routes",
+                    "/private/map/save-route",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Route from '{}' to '{}' successfully saved for user: {}", startAddress, endAddress, authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing save user route request: {}", e.getMessage());
             logError(e, kafkaMessage, "SAVE_USER_ROUTE_ERROR",
                     "Error processing save user route request",
-                    HttpMethod.POST, "/map/routes", authenticatedUser);
+                    HttpMethod.POST, "/private/map/save-route", authenticatedUser);
         }
     }
 
     public void processGetUserRouteHistory(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
+        log.info("Starting to process get user route history request for user: {}", authenticatedUser.getId());
 
         try {
-            log.info("Retrieving route history for user: {}", authenticatedUser.getId());
-
-            authenticatedUser.setLastActivityDate(new Date());
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
 
             userDaoUtils.save(authenticatedUser);
 
@@ -119,27 +146,67 @@ public class RouteService {
                     kafkaMessage.getIpAddress(),
                     String.format("User with ID '%s' retrieved their route history", authenticatedUser.getId()),
                     HttpMethod.GET,
-                    "/map/routes/history",
+                    "/private/map/history/routes",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Route history successfully retrieved for user: {}", authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing get user route history request: {}", e.getMessage());
             logError(e, kafkaMessage, "GET_USER_ROUTE_HISTORY_ERROR",
                     "Error processing get user route history request",
-                    HttpMethod.GET, "/map/routes/history", authenticatedUser);
+                    HttpMethod.GET, "/private/map/history/routes", authenticatedUser);
         }
     }
 
     public void processSaveNewRouteRecalculation(KafkaMessage kafkaMessage) {
         User authenticatedUser = kafkaMessage.getAuthenticatedUser();
+        log.info("Starting to process save new route recalculation request for user: {}", authenticatedUser.getId());
 
         try {
-            log.info("Logging route recalculation for user: {}", authenticatedUser.getId());
-
-            authenticatedUser.setLastActivityDate(new Date());
-
+            authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
             userDaoUtils.save(authenticatedUser);
+
+            Optional<AdminDashboard> optionalAdminDashboard = adminDashboardDaoUtils.find();
+            if (optionalAdminDashboard.isEmpty()) {
+                throw new RuntimeException("Admin dashboard not found");
+            }
+
+            AdminDashboard adminDashboard = optionalAdminDashboard.get();
+            List<HourlyRouteRecalculationResponse> routeRecalculations = adminDashboard.getRouteRecalculations();
+
+            int currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+
+            boolean hourFound = false;
+            for (HourlyRouteRecalculationResponse recalculation : routeRecalculations) {
+                if (recalculation.getHour() == currentHour) {
+                    recalculation.setRecalculationCount(recalculation.getRecalculationCount() + 1);
+                    hourFound = true;
+                    break;
+                }
+            }
+
+            if (!hourFound) {
+                HourlyRouteRecalculationResponse newHourRecalculation = HourlyRouteRecalculationResponse.builder()
+                        .hour(currentHour)
+                        .recalculationCount(1)
+                        .build();
+
+                routeRecalculations.add(newHourRecalculation);
+            }
+
+            adminDashboardDaoUtils.save(
+                    adminDashboard.getId(),
+                    adminDashboard.getAppRatingByNumberOfRate(),
+                    adminDashboard.getTopContributors(),
+                    adminDashboard.getUserGrowthStats(),
+                    adminDashboard.getUserActivityMetrics(),
+                    routeRecalculations,
+                    adminDashboard.getIncidentConfirmationRate(),
+                    adminDashboard.getIncidentsByType(),
+                    adminDashboard.getTotalRoutesProposed()
+            );
 
             logUtils.buildAndSaveLog(
                     LogLevel.INFO,
@@ -147,15 +214,17 @@ public class RouteService {
                     kafkaMessage.getIpAddress(),
                     String.format("User with ID '%s' triggered a route recalculation", authenticatedUser.getId()),
                     HttpMethod.POST,
-                    "/map/routes/recalculation",
+                    "/private/map/route-recalculation",
                     "map-service",
                     null,
                     authenticatedUser.getId()
             );
+            log.info("Route recalculation successfully logged for user: {}", authenticatedUser.getId());
         } catch (Exception e) {
+            log.error("Error occurred while processing save new route recalculation request: {}", e.getMessage());
             logError(e, kafkaMessage, "SAVE_NEW_ROUTE_RECALCULATION_ERROR",
                     "Error processing save new route recalculation request",
-                    HttpMethod.POST, "/map/routes/recalculation", authenticatedUser);
+                    HttpMethod.POST, "/private/map/route-recalculation", authenticatedUser);
         }
     }
 

@@ -14,7 +14,11 @@
 	<artifactId>map-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>map-service</name>
-	<description>Demo project for Spring Boot</description>
+	<description>
+		Real-time navigation service for SUPMAP that handles route optimization, traffic alerts, incident reporting,
+		user location sharing, and community-driven validation of road conditions. Supports favorite location management,
+		navigation preferences, and route history tracking with comprehensive metrics collection for performance monitoring.
+	</description>
 
 	<repositories>
 		<repository>
@@ -43,19 +47,21 @@
 	<properties>
 		<java.version>21</java.version>
 	</properties>
+
 	<dependencies>
+		<!-- Internal shared libraries -->
 		<dependency>
 			<groupId>com.novus</groupId>
 			<artifactId>shared-models</artifactId>
-			<version>1.1.7</version>
+			<version>1.1.9</version>
 		</dependency>
-
 		<dependency>
 			<groupId>com.novus</groupId>
 			<artifactId>database-utils</artifactId>
-			<version>1.1.2</version>
+			<version>1.1.5</version>
 		</dependency>
 
+		<!-- Spring Boot Core -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter</artifactId>
@@ -78,10 +84,20 @@
 			<artifactId>spring-boot-starter-data-mongodb</artifactId>
 		</dependency>
 
-		<!-- Spring Security -->
+		<!-- Messaging with Kafka -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+		<!-- Monitoring with Prometheus -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
 		</dependency>
 
 		<!-- Test -->
@@ -89,11 +105,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.kafka</groupId>
-			<artifactId>spring-kafka</artifactId>
 		</dependency>
 	</dependencies>
 
