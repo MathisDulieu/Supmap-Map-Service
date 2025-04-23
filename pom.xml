@@ -53,7 +53,7 @@
 		<dependency>
 			<groupId>com.novus</groupId>
 			<artifactId>shared-models</artifactId>
-			<version>1.1.9</version>
+			<version>1.2.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.novus</groupId>

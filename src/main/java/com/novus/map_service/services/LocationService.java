@@ -94,6 +94,8 @@ public class LocationService {
                     .formattedAddress(formattedAddress)
                     .postalCode(postalCode)
                     .coordinates(geoPoint)
+                    .createdAt(dateConfiguration.newDate())
+                    .updatedAt(dateConfiguration.newDate())
                     .build();
 
             authenticatedUser.setLastActivityDate(dateConfiguration.newDate());

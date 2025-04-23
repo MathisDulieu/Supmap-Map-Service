@@ -8,7 +8,7 @@ import java.util.Date;
 public class DateConfiguration {
 
     public Date newDate() {
-        return new Date(System.currentTimeMillis() + 3600000);
+        return new Date(System.currentTimeMillis() + 7200000);
     }
 
 }

@@ -62,6 +62,8 @@ public class AlertService {
                     .description(generateAlertDescription(alertType))
                     .location(location)
                     .reportedByUserId(authenticatedUser.getId())
+                    .createdAt(dateConfiguration.newDate())
+                    .updatedAt(dateConfiguration.newDate())
                     .build();
 
             alertDaoUtils.save(alert);
