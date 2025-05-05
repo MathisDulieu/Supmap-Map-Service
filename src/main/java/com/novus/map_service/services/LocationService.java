@@ -76,6 +76,7 @@ public class LocationService {
             String street = request.get("street");
             String formattedAddress = request.get("formattedAddress");
             String postalCode = request.get("postalCode");
+            String userId = request.get("userId");
             double latitude = Double.parseDouble(request.get("latitude"));
             double longitude = Double.parseDouble(request.get("longitude"));
 
@@ -96,6 +97,7 @@ public class LocationService {
                     .coordinates(geoPoint)
                     .createdAt(dateConfiguration.newDate())
                     .updatedAt(dateConfiguration.newDate())
+                    .userId(userId)
                     .build();
 
             authenticatedUser.setLastActivityDate(dateConfiguration.newDate());
